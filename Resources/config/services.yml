@@ -1,0 +1,13 @@
+services:
+    ex_magento.job_executor:
+        class: Keboola\MagentoExtractorBundle\Job\Executor
+        arguments: ['@keboola_extractor.configuration', '@ex_magento.extractor', '@logger', '@syrup.temp', '@syrup.encryptor']
+    ex_magento.extractor:
+        class: Keboola\MagentoExtractorBundle\MagentoExtractor
+        arguments: {  }
+    keboola_extractor.configuration:
+        class: Keboola\ExtractorBundle\Config\Configuration
+        arguments: ['%app_name%', '@syrup.temp', '%required_attributes%']
+parameters:
+    required_attributes: ['api_url']
+    job_config_fields: null
