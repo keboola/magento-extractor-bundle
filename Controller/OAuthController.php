@@ -2,15 +2,13 @@
 
 namespace Keboola\MagentoExtractorBundle\Controller;
 
-use Keboola\ExtractorBundle\Controller\OAuth10Controller;
+use Keboola\ExtractorBundle\Controller\OAuth10Controller,
+	Keboola\ExtractorBundle\Config\Configuration;
 
-// use	Keboola\StorageApi\Client;
+use	Keboola\StorageApi\Client;
 use	Keboola\StorageApi\Config\Reader;
+use	Keboola\Temp\Temp;
 use Syrup\ComponentBundle\Exception\UserException;
-
-// TEST
-use	Symfony\Component\HttpFoundation\Response,
-	Symfony\Component\HttpFoundation\Request;
 
 class OAuthController extends OAuth10Controller
 {
@@ -83,5 +81,29 @@ class OAuthController extends OAuth10Controller
 			$this->sessionBag->get('token'),
 			$this->sessionBag->get('config')
 		);
+	}
+
+	protected function getAppParams()
+	{
+		$configuration = new Configuration($this->appName, new Temp($this->appName), []);
+		$configuration->setStorageApi(new Client(['token' => $this->sessionBag->get('token')]));
+		$data = $configuration->getConfig(
+			['config' => $this->sessionBag->get('config')],
+			"sys.c-{$this->appName}"
+		)->getAttributes();
+
+		$params = [];
+		if (empty($data['oauth']['consumer_key'])) {
+			throw new UserException('Missing configuration attribute \'oauth.consumer_key\'!');
+		} else {
+			$params['api-key'] = $data['oauth']['consumer_key'];
+		}
+		if (empty($data['oauth']['consumer_secret'])) {
+			throw new UserException('Missing configuration attribute \'oauth.consumer_secret\'!');
+		} else {
+			$params['api-secret'] = $data['oauth']['consumer_secret'];
+		}
+
+		return $params;
 	}
 }
