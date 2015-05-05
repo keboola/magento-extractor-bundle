@@ -8,14 +8,14 @@ use Syrup\ComponentBundle\Exception\SyrupComponentException;
 use GuzzleHttp\Client as Client,
 	GuzzleHttp\Subscriber\Oauth\Oauth1;
 use Keboola\MagentoExtractorBundle\MagentoExtractorJob;
+use	Keboola\Code\Builder;
 
 class MagentoExtractor extends Extractor
 {
 	protected $name = "magento";
 
-	public function run(Config $config) {
-
-// $this->testOAuth($config->getAttributes()['api_url'] . '/api/rest/', $config->getAttributes()['oauth']);
+	public function run(Config $config)
+	{
 		$client = new Client(
  			[
 				"base_url" => $config->getAttributes()['api_url'] . '/api/rest/', // from CFG."/api/rest"
@@ -37,38 +37,26 @@ class MagentoExtractor extends Extractor
 		]));
 
 		$parser = $this->getParser($config);
+		$builder = new Builder();
 
 		foreach($config->getJobs() as $jobConfig) {
+
+			$this->metadata['jobs.lastStart.' . $jobConfig->getJobId()] =
+				empty($this->metadata['jobs.lastStart.' . $jobConfig->getJobId()])
+					? 0
+					: $this->metadata['jobs.lastStart.' . $jobConfig->getJobId()];
+			$this->metadata['jobs.start.' . $jobConfig->getJobId()] = time();
+
 			// Otherwise it must be created like Above example, OR within the job itself
 			$job = new MagentoExtractorJob($jobConfig, $client, $parser);
+			$job->setConfigMetadata($this->metadata);
+			$job->setBuilder($builder);
 			$job->run();
+
+			$this->metadata['jobs.lastStart.' . $jobConfig->getJobId()] = $this->metadata['jobs.start.' . $jobConfig->getJobId()];
 		}
 
-		// ONLY available in the Json/Wsdl parsers -
-		// otherwise just pass an array of CsvFile OR Common/Table files to upload
+		$this->updateParserMetadata($parser);
 		return $parser->getCsvFiles();
 	}
-
-protected function testOAuth($url, array $oauth)
-{
-
-// $url = 'http://advintage.staging.nextdigital.com/api/rest/';
-	$o = new \OAuth($oauth['consumer_key'], $oauth['consumer_secret']);
-	$o->enableDebug();
-	$o->setToken($oauth['oauth_token'], $oauth['oauth_token_secret']);
-	try {
-		$o->fetch($url . 'products', [], 'GET', ['Content-Type' => 'application/json',"Accept" => "*/*"]);
-
-	} catch(\Exception $e) {
-		var_dump($e);
-		die();
-
-	}
-
-	$productsList = json_decode($o->getLastResponse());
-	print_r($productsList);
-	die();
-
-}
-
 }

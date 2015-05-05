@@ -2,13 +2,70 @@
 
 namespace Keboola\MagentoExtractorBundle;
 
-use Keboola\ExtractorBundle\Extractor\Jobs\JsonJob;
+use Keboola\ExtractorBundle\Extractor\Jobs\JsonRecursiveJob;
 use	Keboola\Utils\Utils;
-use Syrup\ComponentBundle\Exception\SyrupComponentException;
+use Syrup\ComponentBundle\Exception\SyrupComponentException,
+	Syrup\ComponentBundle\Exception\UserException;
+use	Keboola\Code\Builder,
+	Keboola\Code\Exception\UserScriptException;
 
-class MagentoExtractorJob extends JsonJob
+class MagentoExtractorJob extends JsonRecursiveJob
 {
 	protected $configName;
+
+	/**
+	 * @var int
+	 */
+	protected $page = 1;
+
+	/**
+	 * @var array
+	 */
+	protected $configMetadata;
+
+	/**
+	 * @var Builder
+	 */
+	protected $stringBuilder;
+
+	/**
+	 * @var string
+	 */
+	protected $lastResponseHash;
+
+	public function run()
+	{
+		$this->configName = preg_replace("/[^A-Za-z0-9\-\._]/", "_", trim($this->config["endpoint"], "/"));
+
+		$this->params = (array) Utils::json_decode($this->config["params"]);
+
+		if (!empty($this->params)) {
+			try {
+				foreach($this->params as $key => &$value) {
+					if (is_object($value)) {
+						$value = $this->stringBuilder->run($value, ['metadata' => $this->configMetadata]);
+					}
+					unset($value);
+				}
+			} catch(UserScriptException $e) {
+				throw new UserException("User function failed: " . $e->getMessage());
+			}
+		}
+
+		$request = $this->firstPage();
+		while ($request !== false) { // TODO !empty sounds better, doesn't it? Perhaps it's lazy?
+			$response = $this->download($request);
+
+			$responseHash = sha1(serialize($response));
+			if ($responseHash == $this->lastResponseHash) {
+				break;
+			} else {
+				$this->lastResponseHash = $responseHash;
+				$data = $this->parse($response);
+				$request = $this->nextPage($response, $data);
+			}
+		}
+	}
 
 	/**
 	 * Return a download request
@@ -17,10 +74,8 @@ class MagentoExtractorJob extends JsonJob
 	 */
 	protected function firstPage()
 	{
-		$params = Utils::json_decode($this->config["params"], true);
-		$url = Utils::buildUrl(trim($this->config["endpoint"], "/"), $params);
 
-		$this->configName = preg_replace("/[^A-Za-z0-9\-\._]/", "_", trim($this->config["endpoint"], "/"));
+		$url = Utils::buildUrl(trim($this->config["endpoint"], "/"), $this->params);
 
 		return $this->client->createRequest("GET", $url);
 	}
@@ -33,11 +88,19 @@ class MagentoExtractorJob extends JsonJob
 	 */
 	protected function nextPage($response, $data)
 	{
-// 		if (empty($response->pagination->next_url)) {
+		$limit = empty($this->params['limit']) ? 10 : $this->params['limit'];
+		if (count($data) < $limit) {
 			return false;
-// 		}
+		}
 
-// 		return $this->client->createRequest("GET", $response->pagination->next_url);
+		$this->page++;
+
+		$url = Utils::buildUrl(
+			trim($this->config["endpoint"], "/"),
+			array_replace((array) $this->params, ['page' => $this->page])
+		);
+
+		return $this->client->createRequest("GET", $url);
 	}
 
 	/**
@@ -47,15 +110,19 @@ class MagentoExtractorJob extends JsonJob
 	 */
 	protected function parse($response)
 	{
-// ini_set('xdebug.var_display_max_depth', -1);
-// ini_set('xdebug.var_display_max_children', -1);
-// ini_set('xdebug.var_display_max_data', -1);
-// var_dump(json_encode($response, JSON_PRETTY_PRINT));
-// die();
+		return parent::parse((array) $response);
+	}
 
-		/**
-		 * Edit according to the parser used
-		 */
-		parent::parse((array) $response);
+	public function setConfigMetadata(array $data)
+	{
+		$this->configMetadata = $data;
+	}
+
+	/**
+	 * @param Builder $builder
+	 */
+	public function setBuilder(Builder $builder)
+	{
+		$this->stringBuilder = $builder;
 	}
 }
