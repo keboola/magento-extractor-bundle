@@ -21,7 +21,11 @@ class MagentoExtractor extends Extractor
 				"base_url" => $config->getAttributes()['api_url'] . '/api/rest/', // from CFG."/api/rest"
 				"defaults" => [
 					"auth" => "oauth",
-					"headers" => ['Content-Type' => 'application/json',"Accept" => "*/*"]
+					"headers" => [
+						'Content-Type' => 'application/json',
+						"Accept" => "*/*",
+						'User-Agent' => 'Keboola Connection Magento Extractor'
+					]
 				]
 			]
 		);
