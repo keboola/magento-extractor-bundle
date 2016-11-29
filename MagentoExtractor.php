@@ -37,7 +37,8 @@ class MagentoExtractor extends Extractor
 			'consumer_secret' => $OAuth['consumer_secret'],
 			'request_method' => Oauth1::REQUEST_METHOD_HEADER,
 			'token' => $OAuth['oauth_token'],
-			'token_secret' => $OAuth['oauth_token_secret']
+			'token_secret' => $OAuth['oauth_token_secret'],
+			'signature_method' => $this->configSignatureToOAuth($config->getAttributes()['signature_method'])
 		]));
 
 		$parser = $this->getParser($config);
@@ -62,5 +63,22 @@ class MagentoExtractor extends Extractor
 
 		$this->updateParserMetadata($parser);
 		return $parser->getCsvFiles();
+	}
+
+	private function configSignatureToOAuth($configSignature)
+	{
+		switch($configSignature)
+		{
+			case 'HMAC-SHA1':
+				return Oauth1::SIGNATURE_METHOD_HMAC;
+
+			case 'PLAINTEXT':
+				return Oauth1::SIGNATURE_METHOD_PLAINTEXT;
+
+			case 'RSA-SHA1':
+				return Oauth1::SIGNATURE_METHOD_RSA;
+		}
+
+		return Oauth1::SIGNATURE_METHOD_HMAC;
 	}
 }
