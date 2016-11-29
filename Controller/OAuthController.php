@@ -4,7 +4,7 @@ namespace Keboola\MagentoExtractorBundle\Controller;
 
 use Keboola\ExtractorBundle\Controller\OAuth10Controller,
 	Keboola\ExtractorBundle\Config\Configuration;
-
+use     Symfony\Component\HttpFoundation\Request;
 use	Keboola\StorageApi\Client;
 use	Keboola\StorageApi\Config\Reader;
 use	Keboola\Temp\Temp;
