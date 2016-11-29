@@ -30,7 +30,14 @@ class OAuthController extends OAuth10Controller
 	 * @var string
 	 */
 	protected $accessTokenUrl = "/oauth/token";
-
+	
+	
+        public function preExecute(Request $request)
+        {
+            parent::preExecute($request);
+            Request::setTrustedProxies(array($request->server->get('REMOTE_ADDR')));
+        }
+	
 	/**
 	 * Create OAuth /authenticate URL
 	 * See (C) at @link http://oauth.net/core/diagram.png
