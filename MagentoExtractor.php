@@ -28,6 +28,8 @@ class MagentoExtractor extends Extractor
 	{
 		$signatureMethod = $config->getAttributes()['signature_method'];
 
+		$OAuth = $config->getAttributes()['oauth'];
+
 		$clientConfig = [
 			"base_url" => $config->getAttributes()['api_url'] . '/api/rest/', // from CFG."/api/rest"
 			"defaults" => [
@@ -51,8 +53,6 @@ class MagentoExtractor extends Extractor
 		
 		$client = new Client($clientConfig);
 		$client->getEmitter()->attach($this->getBackoff());
-
-		$OAuth = $config->getAttributes()['oauth'];
 
 		// Vokurka: in case we are not using plaintext signature, we do everything normally
 		if ($signatureMethod != 'PLAINTEXT'){
