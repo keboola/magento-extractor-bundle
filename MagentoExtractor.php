@@ -14,32 +14,57 @@ class MagentoExtractor extends Extractor
 {
 	protected $name = "magento";
 
+	private function generateRandomString($length = 10) {
+		$characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+		$charactersLength = strlen($characters);
+		$randomString = '';
+		for ($i = 0; $i < $length; $i++) {
+			$randomString .= $characters[rand(0, $charactersLength - 1)];
+		}
+		return $randomString;
+	}
+
 	public function run(Config $config)
 	{
-		$client = new Client(
- 			[
-				"base_url" => $config->getAttributes()['api_url'] . '/api/rest/', // from CFG."/api/rest"
-				"defaults" => [
-					"auth" => "oauth",
-					"headers" => [
-						'Content-Type' => 'application/json',
-						"Accept" => "*/*",
-						'User-Agent' => 'Keboola Connection Magento Extractor'
-					]
+		$signatureMethod = $config->getAttributes()['signature_method'];
+
+		$clientConfig = [
+			"base_url" => $config->getAttributes()['api_url'] . '/api/rest/', // from CFG."/api/rest"
+			"defaults" => [
+				"headers" => [
+					'Content-Type' => 'application/json',
+					"Accept" => "*/*",
+					'User-Agent' => 'Keboola Connection Magento Extractor'
 				]
 			]
-		);
+		];
+
+		// Vokurka: Constructing my own signed OAuth1 request, because implementation in Guzzle is just wrong.
+		if ($signatureMethod == 'PLAINTEXT')
+		{
+			$clientConfig['defaults']['headers']['Authorization'] = 'OAuth oauth_consumer_key="'.$OAuth['consumer_key'].'",oauth_token="'.$OAuth['oauth_token'].'",oauth_signature_method="PLAINTEXT",oauth_timestamp="'.time().'",oauth_nonce="'.$this->generateRandomString().'",oauth_signature="'.$OAuth['consumer_secret'].'%26'.$OAuth['oauth_token_secret'].'"';
+		}
+		else
+		{
+			$clientConfig['defaults']['auth'] = "oauth";
+		}
+		
+		$client = new Client($clientConfig);
 		$client->getEmitter()->attach($this->getBackoff());
 
 		$OAuth = $config->getAttributes()['oauth'];
-		$client->getEmitter()->attach(new Oauth1([
-			'consumer_key' => $OAuth['consumer_key'],
-			'consumer_secret' => $OAuth['consumer_secret'],
-			'request_method' => Oauth1::REQUEST_METHOD_HEADER,
-			'token' => $OAuth['oauth_token'],
-			'token_secret' => $OAuth['oauth_token_secret'],
-			'signature_method' => $this->configSignatureToOAuth($config->getAttributes()['signature_method'])
-		]));
+
+		// Vokurka: in case we are not using plaintext signature, we do everything normally
+		if ($signatureMethod != 'PLAINTEXT'){
+			$client->getEmitter()->attach(new Oauth1([
+				'consumer_key' => $OAuth['consumer_key'],
+				'consumer_secret' => $OAuth['consumer_secret'],
+				'request_method' => Oauth1::REQUEST_METHOD_HEADER,
+				'token' => $OAuth['oauth_token'],
+				'token_secret' => $OAuth['oauth_token_secret'],
+				'signature_method' => $this->configSignatureToOAuth($config->getAttributes()['signature_method'])
+			]));
+		}
 
 		$parser = $this->getParser($config);
 		$builder = new Builder();
